@@ -30,8 +30,7 @@ export async function POST(request: Request) {
     }
 
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY 
-    })
+      apiKey: process.env.OPENAI_API_KEY })
 
     // Build the full prompt
     let finalPrompt = prompt || 'Generate an image based on the reference provided'

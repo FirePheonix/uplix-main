@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button"; // Adjust to your path
 import { TextEffect } from "@/components/TextEffect"; // Adjust to your path
@@ -38,30 +39,32 @@ const transitionVariants = {
 };
 
 export function HeroSection2() {
+    const router = useRouter();
+    
     const defaultItems = [
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774805/Behance-screen.png`,
-            text: "Behance",
+            image: `/ai-images/1.png`,
+            text: "AI Image 1",
         },
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774805/Notion-screen.png`,
-            text: "Notion",
+            image: `/ai-images/2.jpg`,
+            text: "AI Image 2",
         },
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774806/One-screen.png`,
-            text: "One",
+            image: `/ai-images/3.jpeg`,
+            text: "AI Image 3",
         },
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774807/Reddit-nj7hwh.png`,
-            text: "Reddit",
+            image: `/ai-images/4.jpeg`,
+            text: "AI Image 4",
         },
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774805/Behance-screen.png`,
-            text: "Behance",
+            image: `/ai-images/5.jpeg`,
+            text: "AI Image 5",
         },
         {
-            image: `https://res.cloudinary.com/harshitproject/image/upload/v1746774805/Notion-screen.png`,
-            text: "Notion",
+            image: `/ai-images/6.jpeg`,
+            text: "AI Image 6",
         },
     ];
 
@@ -95,47 +98,29 @@ export function HeroSection2() {
                                     Create content. Schedule posts. Find creators. Manage Socials.
                                 </motion.p>
 
-                                <AnimatedGroup
-                                    variants={{
-                                        container: {
-                                            visible: {
-                                                transition: {
-                                                    staggerChildren: 0.05,
-                                                    delayChildren: 0.75,
-                                                },
-                                            },
-                                        },
-                                        ...transitionVariants,
-                                    }}
-                                    className="mt-12 flex flex-col items-center justify-center gap-2 md:flex-row"
-                                >
-                                    <div key={1} className="">
+                                <div className="mt-12 flex flex-col items-center justify-center gap-2 md:flex-row">
+                                    <Link href="/dashboard">
                                         <Button
-                                            asChild
                                             size="lg"
                                             className="rounded-md px-5 text-base dark:bg-white bg-black"
                                         >
-                                            <Link href="#link">
-                        <span className="text-nowra dark:text-black text-white">
-                          Browse Designs
-                        </span>
-                                            </Link>
+                                            <span className="text-nowra dark:text-black text-white">
+                                              Browse Designs
+                                            </span>
                                         </Button>
-                                    </div>
-                                    <Button
-                                        key={2}
-                                        asChild
-                                        size="lg"
-                                        variant="ghost"
-                                        className="rounded-md px-5 bg-foreground/10"
-                                    >
-                                        <Link href="#link">
-                      <span className="text-nowrap dark:text-white text-black">
-                        Submit Your Work
-                      </span>
-                                        </Link>
-                                    </Button>
-                                </AnimatedGroup>
+                                    </Link>
+                                    <Link href="#link">
+                                        <Button
+                                            size="lg"
+                                            variant="ghost"
+                                            className="rounded-md px-5 bg-foreground/10"
+                                        >
+                                            <span className="text-nowrap dark:text-white text-black">
+                                              Submit Your Work
+                                            </span>
+                                        </Button>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
 

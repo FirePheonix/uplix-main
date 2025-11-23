@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, memo, ChangeEvent } from 'react';
+import { useState, useCallback, memo, ChangeEvent, useEffect } from 'react';
 import {
   ReactFlow,
   Controls as FlowControls,
@@ -23,6 +23,10 @@ import {
 // @ts-ignore - CSS import
 import '@xyflow/react/dist/style.css';
 import DashboardSidebar from '@/components/dashboard/sidebar';
+import { WorkflowSelector } from '@/components/workflow-selector';
+import { WorkspaceSelector } from '@/components/workspace-selector';
+import type { WorkflowTemplate } from '@/lib/workflow-templates';
+import { Sparkles } from 'lucide-react';
 
 // Type definitions
 interface TextNodeData extends Record<string, unknown> {
@@ -1334,11 +1338,36 @@ const nodeTypes = {
 function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [showWorkflowSelector, setShowWorkflowSelector] = useState(false);
+  const [currentWorkspace, setCurrentWorkspace] = useState<any>(null);
+
+  // Check for template to load from sessionStorage
+  useEffect(() => {
+    const templateId = sessionStorage.getItem('loadTemplateId');
+    if (templateId) {
+      // Load template from workflow-templates
+      import('@/lib/workflow-templates').then(({ workflowTemplates }) => {
+        const template = workflowTemplates.find((t) => t.id === templateId);
+        if (template) {
+          setNodes(template.nodes);
+          setEdges(template.edges);
+        }
+      });
+      // Clear the session storage
+      sessionStorage.removeItem('loadTemplateId');
+    }
+  }, [setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  const handleTemplateSelect = useCallback((template: WorkflowTemplate) => {
+    setNodes(template.nodes);
+    setEdges(template.edges);
+    setShowWorkflowSelector(false);
+  }, [setNodes, setEdges]);
 
   const addTextNode = useCallback(() => {
     const newNode: Node = {
@@ -1405,8 +1434,68 @@ function FlowCanvas() {
     setNodes((nds) => [...nds, newNode]);
   }, [setNodes]);
 
+  const handleSaveWorkspace = useCallback(async (workspaceName: string) => {
+    try {
+      const flowData = {
+        nodes,
+        edges,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (currentWorkspace?.id) {
+        // Update existing workspace
+        const response = await fetch(`/api/workspaces/${currentWorkspace.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: workspaceName,
+            flow_data: flowData,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to update workspace');
+        
+        const { workspace } = await response.json();
+        setCurrentWorkspace(workspace);
+        alert('Workspace saved successfully!');
+      } else {
+        // Create new workspace
+        const response = await fetch('/api/workspaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: workspaceName,
+            flow_data: flowData,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to create workspace');
+        
+        const { workspace } = await response.json();
+        setCurrentWorkspace(workspace);
+        alert('Workspace created successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving workspace:', error);
+      alert('Failed to save workspace');
+    }
+  }, [nodes, edges, currentWorkspace]);
+
+  const handleLoadWorkspace = useCallback((workspace: any) => {
+    if (workspace.flow_data) {
+      setNodes(workspace.flow_data.nodes || []);
+      setEdges(workspace.flow_data.edges || []);
+    }
+  }, [setNodes, setEdges]);
+
   return (
     <div className="h-screen bg-background">
+      <WorkflowSelector
+        isOpen={showWorkflowSelector}
+        onSelectTemplate={handleTemplateSelect}
+        onClose={() => setShowWorkflowSelector(false)}
+      />
+      
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -1420,41 +1509,62 @@ function FlowCanvas() {
         <Background />
         <FlowControls />
 
+        {/* Top Panel - Workspace Selector */}
+        <Panel position="top-center" className="mt-4">
+          <WorkspaceSelector
+            currentWorkspace={currentWorkspace}
+            onWorkspaceChange={setCurrentWorkspace}
+            onSave={handleSaveWorkspace}
+            onLoad={handleLoadWorkspace}
+          />
+        </Panel>
+
         {/* Bottom Toolbar */}
-        <Panel position="bottom-center" className="mb-4">
-          <div className="flex gap-2 bg-background/80 backdrop-blur-sm border border-border rounded-2xl p-2 shadow-lg">
+        <Panel position="bottom-center" className="mb-8">
+          <div className="flex gap-3 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-2xl">
+            <button
+              onClick={() => setShowWorkflowSelector(true)}
+              title="Workflow Templates"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4 stroke-[2]" />
+              Templates
+            </button>
+            
+            <div className="w-px bg-white/10" />
+            
             <button
               onClick={addTextNode}
               title="Add Text Node"
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all"
             >
               + Text
             </button>
             <button
               onClick={addImageNode}
               title="Add Image Node"
-              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all"
             >
               + Image
             </button>
             <button
               onClick={addVideoNode}
               title="Add Video Node"
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all"
             >
               + Video
             </button>
             <button
               onClick={addAudioNode}
               title="Add Audio Node"
-              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all"
             >
               + Audio
             </button>
             <button
               onClick={addAppenderNode}
               title="Add Appender Node"
-              className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/20 text-white text-sm rounded-xl transition-all"
             >
               + Appender
             </button>

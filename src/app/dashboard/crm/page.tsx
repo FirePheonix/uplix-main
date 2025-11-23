@@ -1,10 +1,136 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DashboardSidebar from '@/components/dashboard/sidebar'
-import { LayoutDashboard, Instagram, Twitter, Calendar, TrendingUp, Users, MessageSquare, Eye } from 'lucide-react'
+import { LayoutDashboard, Instagram, Twitter, Calendar, TrendingUp, Users, MessageSquare, Eye, Loader2, Clock, Image as ImageIcon, Video } from 'lucide-react'
+import Image from 'next/image'
+
+type ScheduledPost = {
+  id: string
+  media_url: string
+  media_type: 'image' | 'video'
+  caption: string
+  schedule_time: string
+  status: 'scheduled' | 'posted' | 'failed'
+  created_at: string
+  instagram_post_id?: string
+  error_message?: string
+}
+
+type InstagramInsights = {
+  followers: number
+  followersGrowth: string
+  engagement: number
+  engagementGrowth: string
+  totalViews: number
+  viewsGrowth: string
+  messages: number
+  messagesGrowth: string
+  mediaCount: number
+  followingCount: number
+  username: string
+}
 
 export default function CRMPage() {
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'timeline' | 'calendar'>('timeline')
+  const [insights, setInsights] = useState<InstagramInsights | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchScheduledPosts()
+    fetchInstagramInsights()
+  }, [])
+
+  const fetchInstagramInsights = async () => {
+    try {
+      setInsightsLoading(true)
+      const instagramData = localStorage.getItem('instagram_data')
+      
+      if (!instagramData) {
+        console.log('No Instagram credentials found in localStorage')
+        setInsightsLoading(false)
+        return
+      }
+
+      const credentials = JSON.parse(instagramData)
+      console.log('Instagram credentials:', credentials)
+      
+      const response = await fetch('/api/instagram/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          accessToken: credentials.accessToken, 
+          userId: credentials.userId,
+          username: credentials.username 
+        })
+      })
+
+      const data = await response.json()
+      console.log('Insights response:', data)
+      
+      if (data.success) {
+        setInsights(data.insights)
+      } else {
+        console.error('Insights error:', data.error)
+      }
+    } catch (error) {
+      console.error('Error fetching Instagram insights:', error)
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
+
+  const fetchScheduledPosts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/scheduled-posts')
+      const data = await response.json()
+      
+      if (data.success) {
+        setScheduledPosts(data.scheduledPosts || [])
+      }
+    } catch (error) {
+      console.error('Error fetching scheduled posts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getCalendarDays = () => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    
+    const days = []
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(year, month, i)
+      const postsOnDay = scheduledPosts.filter(post => {
+        const postDate = new Date(post.schedule_time)
+        return postDate.getDate() === i && 
+               postDate.getMonth() === month && 
+               postDate.getFullYear() === year
+      })
+      days.push({ day: i, posts: postsOnDay })
+    }
+    
+    return days
+  }
   return (
     <div className="flex h-screen bg-[#0a0a0a] text-white">
       <DashboardSidebar />
@@ -31,105 +157,221 @@ export default function CRMPage() {
         <div className="p-6 space-y-6">
           {/* Overview Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <OverviewCard 
-              title="Total Followers" 
-              value="20.7K" 
-              change="+12.5%" 
-              icon={Users}
-              color="text-blue-400"
-            />
-            <OverviewCard 
-              title="Engagement Rate" 
-              value="5.8%" 
-              change="+2.3%" 
-              icon={TrendingUp}
-              color="text-green-400"
-            />
-            <OverviewCard 
-              title="Total Views" 
-              value="145.2K" 
-              change="+18.7%" 
-              icon={Eye}
-              color="text-purple-400"
-            />
-            <OverviewCard 
-              title="Messages" 
-              value="234" 
-              change="+5.2%" 
-              icon={MessageSquare}
-              color="text-pink-400"
-            />
+            {insightsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-4 animate-pulse">
+                  <div className="h-4 bg-[#1a1a1a] rounded w-24 mb-3"></div>
+                  <div className="h-8 bg-[#1a1a1a] rounded w-16 mb-2"></div>
+                  <div className="h-3 bg-[#1a1a1a] rounded w-20"></div>
+                </div>
+              ))
+            ) : insights ? (
+              <>
+                <OverviewCard 
+                  title="Total Followers" 
+                  value={insights.followers.toLocaleString()} 
+                  change={insights.followersGrowth} 
+                  icon={Users}
+                  color="text-blue-400"
+                />
+                <OverviewCard 
+                  title="Engagement Rate" 
+                  value={`${insights.engagement}%`} 
+                  change={insights.engagementGrowth} 
+                  icon={TrendingUp}
+                  color="text-green-400"
+                />
+                <OverviewCard 
+                  title="Total Views" 
+                  value={insights.totalViews.toLocaleString()} 
+                  change={insights.viewsGrowth} 
+                  icon={Eye}
+                  color="text-purple-400"
+                />
+                <OverviewCard 
+                  title="Messages" 
+                  value={insights.messages.toString()} 
+                  change={insights.messagesGrowth} 
+                  icon={MessageSquare}
+                  color="text-pink-400"
+                />
+              </>
+            ) : (
+              <div className="col-span-4 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6 text-center">
+                <Instagram className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+                <p className="text-gray-400">Connect Instagram to see insights</p>
+                <p className="text-sm text-gray-500 mt-1">Schedule a post from the Edit page to connect</p>
+              </div>
+            )}
           </div>
 
           {/* Platform Performance */}
           <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6">
             <h2 className="text-xl font-bold mb-6">Platform Performance</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <PlatformCard 
-                platform="Instagram"
-                icon={Instagram}
-                color="bg-gradient-to-r from-purple-500 to-pink-500"
-                followers="12.5K"
-                engagement="4.8%"
-                posts="127"
-                growth="+15%"
-              />
-              <PlatformCard 
-                platform="Twitter"
-                icon={Twitter}
-                color="bg-blue-500"
-                followers="8.2K"
-                engagement="6.2%"
-                posts="1,543"
-                growth="+8%"
-              />
-            </div>
+            {insightsLoading ? (
+              <div className="animate-pulse">
+                <div className="h-32 bg-[#1a1a1a] rounded-lg"></div>
+              </div>
+            ) : insights ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <PlatformCard 
+                  platform="Instagram"
+                  icon={Instagram}
+                  color="bg-gradient-to-r from-purple-500 to-pink-500"
+                  followers={insights.followers.toLocaleString()}
+                  engagement={`${insights.engagement}%`}
+                  posts={insights.mediaCount.toString()}
+                  growth={insights.followersGrowth}
+                />
+                <PlatformCard 
+                  platform="Twitter"
+                  icon={Twitter}
+                  color="bg-blue-500"
+                  followers="8.2K"
+                  engagement="6.2%"
+                  posts="1,543"
+                  growth="+8%"
+                />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>No platform data available</p>
+              </div>
+            )}
           </div>
 
-          {/* Unified Post Schedule */}
+          {/* Scheduled Posts */}
           <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Scheduled Posts - All Platforms</h2>
-              <button className="px-4 py-2 bg-purple-500 rounded-lg font-medium hover:bg-purple-600 transition-colors">
-                Schedule New Post
-              </button>
+              <h2 className="text-xl font-bold">Scheduled Instagram Posts</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    viewMode === 'timeline' ? 'bg-purple-500 text-white' : 'bg-[#1a1a1a] text-gray-400 hover:bg-[#222]'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    viewMode === 'calendar' ? 'bg-purple-500 text-white' : 'bg-[#1a1a1a] text-gray-400 hover:bg-[#222]'
+                  }`}
+                >
+                  Calendar
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              <ScheduledPostItem 
-                platform="Instagram"
-                platformColor="text-pink-500"
-                icon={Instagram}
-                content="New collection dropping soon! 🔥"
-                scheduledFor="Today at 6:00 PM"
-                type="Post with image"
-              />
-              <ScheduledPostItem 
-                platform="Twitter"
-                platformColor="text-blue-400"
-                icon={Twitter}
-                content="Just launched our new feature! Check it out and let us know what you think 🚀"
-                scheduledFor="Today at 10:00 AM"
-                type="Tweet with media"
-              />
-              <ScheduledPostItem 
-                platform="Instagram"
-                platformColor="text-pink-500"
-                icon={Instagram}
-                content="Behind the scenes magic ✨"
-                scheduledFor="Tomorrow at 3:00 PM"
-                type="Story"
-              />
-              <ScheduledPostItem 
-                platform="Twitter"
-                platformColor="text-blue-400"
-                icon={Twitter}
-                content="Behind the scenes of our latest project. The team has been working hard! 💪✨"
-                scheduledFor="Tomorrow at 2:00 PM"
-                type="Tweet"
-              />
-            </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              </div>
+            ) : scheduledPosts.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                <p className="text-gray-400">No scheduled posts yet</p>
+                <p className="text-sm text-gray-500 mt-1">Schedule posts from the Edit page</p>
+              </div>
+            ) : viewMode === 'timeline' ? (
+              <div className="space-y-4">
+                {scheduledPosts.map((post) => (
+                  <div key={post.id} className="flex items-start gap-4 p-4 bg-[#1a1a1a] rounded-lg hover:bg-[#222] transition-colors">
+                    <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                      {post.media_type === 'video' ? (
+                        <video src={post.media_url} className="w-full h-full object-cover" />
+                      ) : (
+                        <Image src={post.media_url} alt="Post" fill className="object-cover" />
+                      )}
+                      <div className="absolute top-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
+                        {post.media_type === 'video' ? (
+                          <Video className="w-3 h-3 text-white" />
+                        ) : (
+                          <ImageIcon className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Instagram className="w-4 h-4 text-pink-500" />
+                        <span className="text-sm font-medium text-pink-500">Instagram</span>
+                        <span className="text-xs text-gray-500">·</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          post.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
+                          post.status === 'posted' ? 'bg-green-500/20 text-green-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {post.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm mb-2 line-clamp-2">{post.caption}</p>
+                      
+                      <div className="flex items-center gap-4 text-xs text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatDate(post.schedule_time)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                        if (confirm('Delete this scheduled post?')) {
+                          // TODO: Implement delete
+                        }
+                      }}
+                      className="text-sm text-red-400 hover:text-red-300"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div className="text-center mb-4">
+                  <h3 className="text-lg font-semibold">
+                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h3>
+                </div>
+                
+                <div className="grid grid-cols-7 gap-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center text-sm text-gray-400 mb-2 font-medium">
+                      {day}
+                    </div>
+                  ))}
+                  
+                  {getCalendarDays().map(({ day, posts }) => (
+                    <div
+                      key={day}
+                      className={`
+                        aspect-square rounded-lg flex flex-col items-center justify-center text-sm relative
+                        ${posts.length > 0 
+                          ? 'bg-purple-500/20 border-2 border-purple-500 text-white font-medium cursor-pointer hover:bg-purple-500/30' 
+                          : 'bg-[#1a1a1a] text-gray-400 hover:bg-[#222]'
+                        }
+                        transition-colors
+                      `}
+                      title={posts.length > 0 ? `${posts.length} scheduled post${posts.length > 1 ? 's' : ''}` : undefined}
+                    >
+                      <span>{day}</span>
+                      {posts.length > 0 && (
+                        <div className="absolute bottom-1 flex gap-0.5">
+                          {posts.slice(0, 3).map((_, i) => (
+                            <div key={i} className="w-1 h-1 rounded-full bg-purple-400" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Engagement Analytics */}

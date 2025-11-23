@@ -26,10 +26,8 @@ export async function POST(request: Request) {
       console.error('❌ No prompt or input reference provided')
       return NextResponse.json({ error: 'Either prompt or input reference is required' }, { status: 400 })
     }
-
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY 
-    })
+      apiKey: process.env.OPENAI_API_KEY })
 
     // Build the full prompt
     let finalPrompt = prompt || 'Generate a video based on the reference provided'
